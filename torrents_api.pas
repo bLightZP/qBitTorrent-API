@@ -26,10 +26,6 @@ const
   iPriorityHighPriority    = 6;
   iPriorityMaximalPriority = 7;
 
-
-
-
-
   dlstateUnknown           = -1;
   dlstateError             =  0;
   dlstatePaused            =  1;
@@ -88,14 +84,15 @@ var
 
 function  qBitRecordToString(Entry : PQBitFileRecord) : WideString;
 function  qBittorrent_ReadyForPlayback(cItem : PQBitFileRecord; TorrentList : TList) : Integer;
-procedure qBittorrent_GetFileList(Address : String; Port : Integer; TorrentList,FileList : TList; AbortFlag : PBoolean);
-procedure qBittorrent_IncreaseFilePriority(Address : String; Port,FileID : Integer; TorrentHash : String; FileList : TList);
-procedure qBittorrent_DecreaseFilePriority(Address : String; Port,FileID : Integer; TorrentHash : String; FileList : TList);
 procedure qBittorrent_ClearItemList(FileList : TList);
 procedure qBittorrent_ClearTorrentList(TorrentList : TList);
 procedure qBittorrent_ItemID_to_HashAndFileID(sItemID : WideString; var iFileIndex : Integer; var sHash : String);
+
+procedure qBittorrent_GetFileList(Address : String; Port : Integer; TorrentList,FileList : TList; AbortFlag : PBoolean);
 procedure qBittorrent_PauseTorrent(Address : String; Port : Integer; TorrentHash : String);
 procedure qBittorrent_ResumeTorrent(Address : String; Port : Integer; TorrentHash : String);
+procedure qBittorrent_IncreaseFilePriority(Address : String; Port,FileID : Integer; TorrentHash : String; FileList : TList);
+procedure qBittorrent_DecreaseFilePriority(Address : String; Port,FileID : Integer; TorrentHash : String; FileList : TList);
 procedure qBittorrent_EraseTorrent(Address : String; Port : Integer; TorrentHash : String);
 procedure qBittorrent_DownloadTorrent(Address : String; Port : Integer; sDownload : AnsiString);
 
@@ -203,7 +200,8 @@ begin
 
   //sDownload := HTTPPostRequest(sPost, qBitReferer, qBitTorrentPort);
   Try
-    sDownload := HTTPPostData(URLIdentifier, qbitReferer, Address, Port, '/command/download',sHeader, sPost);
+    //sDownload := HTTPPostData(URLIdentifier, qbitReferer, Address, Port, '/command/download',sHeader, sPost);
+    sDownload := HTTPPostData(URLIdentifier, qbitReferer, Address, Port, '/api/v2/torrents/add',sHeader, sPost);
   Except
   End;
   {$IFDEF LOCALTRACE}DebugMsgFT(logPath,'qBitTorrent_DownloadTorrent (after)'+CRLF);{$ENDIF}
@@ -217,12 +215,11 @@ var
   sHeader : String;
 begin
   {$IFDEF LOCALTRACE}DebugMsgFT(logPath,'qBitTorrent_EraseTorrent('+TorrentHash+') (before)');{$ENDIF}
-  sPost   := 'hashes='+TorrentHash;
+  sPost   := 'hashes='+TorrentHash+'&deleteFiles=false';
   sHeader := 'Content-Type: application/x-www-form-urlencoded'+CRLF+'Content-Length: '+IntToStr(Length(sPost));
   {$IFDEF LOCALTRACE}DebugMsgFT(logPath,'HTTPPostData = "'+sPost+'"');{$ENDIF}
   Try
-    S := HTTPPostData(URLIdentifier, qbitReferer, Address, Port, '/command/delete',sHeader, sPost); // just the torrent
-    //S := HTTPPostData(URLIdentifier, qbitReferer, Address, Port, '/command/deletePerm',sHeader, sPost); // with the downloaded content
+    S := HTTPPostData(URLIdentifier, qbitReferer, Address, Port, '/api/v2/torrents/delete',sHeader, sPost);
   Except
   End;
   {$IFDEF LOCALTRACE}DebugMsgFT(logPath,'qBitTorrent_EraseTorrent, result = "'+S+'"'+CRLF);{$ENDIF}
@@ -236,11 +233,13 @@ var
   sHeader : String;
 begin
   {$IFDEF LOCALTRACE}DebugMsgFT(logPath,'qBitTorrent_PauseTorrent('+TorrentHash+') (before)');{$ENDIF}
-  sPost   := 'hash='+TorrentHash;
+
+  sPost   := 'hashes='+TorrentHash;
   sHeader := 'Content-Type: application/x-www-form-urlencoded'+CRLF+'Content-Length: '+IntToStr(Length(sPost));
   {$IFDEF LOCALTRACE}DebugMsgFT(logPath,'HTTPPostData = "'+sPost+'"');{$ENDIF}
   Try
-    S := HTTPPostData(URLIdentifier, qbitReferer, Address, Port, '/command/pause',sHeader, sPost);
+    //S := HTTPPostData(URLIdentifier, qbitReferer, Address, Port, '/command/pause',sHeader, sPost);
+    S := HTTPPostData(URLIdentifier, qbitReferer, Address, Port, '/api/v2/torrents/pause',sHeader, sPost);
   Except
   End;
   {$IFDEF LOCALTRACE}DebugMsgFT(logPath,'qBitTorrent_PauseTorrent, result = "'+S+'"'+CRLF);{$ENDIF}
@@ -254,11 +253,11 @@ var
   sHeader : String;
 begin
   {$IFDEF LOCALTRACE}DebugMsgFT(logPath,'qBitTorrent_ResumeTorrent('+TorrentHash+') (before)');{$ENDIF}
-  sPost   := 'hash='+TorrentHash;
+  sPost   := 'hashes='+TorrentHash;
   sHeader := 'Content-Type: application/x-www-form-urlencoded'+CRLF+'Content-Length: '+IntToStr(Length(sPost));
   {$IFDEF LOCALTRACE}DebugMsgFT(logPath,'HTTPPostData = "'+sPost+'"');{$ENDIF}
   Try
-    S := HTTPPostData(URLIdentifier, qbitReferer, Address, Port, '/command/resume',sHeader, sPost);
+    S := HTTPPostData(URLIdentifier, qbitReferer, Address, Port, '/api/v2/torrents/resume',sHeader, sPost);
   Except
   End;
   {$IFDEF LOCALTRACE}DebugMsgFT(logPath,'qBitTorrent_ResumeTorrent, result = "'+S+'"'+CRLF);{$ENDIF}
@@ -341,7 +340,8 @@ begin
       sHeader := 'Content-Type: application/x-www-form-urlencoded'+CRLF+'Content-Length: '+IntToStr(Length(sPost));
       {$IFDEF LOCALTRACE}DebugMsgFT(logPath,'HTTPPostData = "'+sPost+'"');{$ENDIF}
       Try
-        S := HTTPPostData(URLIdentifier, qbitReferer, Address, Port, '/command/setFilePrio',sHeader, sPost);
+        //S := HTTPPostData(URLIdentifier, qbitReferer, Address, Port, '/command/setFilePrio',sHeader, sPost);
+        S := HTTPPostData(URLIdentifier, qbitReferer, Address, Port, '/api/v2/torrents/filePrio',sHeader, sPost);
       Except
       End;
       {$IFDEF LOCALTRACE}DebugMsgFT(logPath,'HTTPPostData result = "'+S+'"');{$ENDIF}
@@ -375,7 +375,8 @@ begin
       sHeader := 'Content-Type: application/x-www-form-urlencoded'+CRLF+'Content-Length: '+IntToStr(Length(sPost));
       {$IFDEF LOCALTRACE}DebugMsgFT(logPath,'HTTPPostData = "'+sPost+'"');{$ENDIF}
       Try
-        S := HTTPPostData(URLIdentifier, qbitReferer, Address, Port, '/command/setFilePrio',sHeader, sPost);
+        //S := HTTPPostData(URLIdentifier, qbitReferer, Address, Port, '/command/setFilePrio',sHeader, sPost);
+        S := HTTPPostData(URLIdentifier, qbitReferer, Address, Port, '/api/v2/torrents/filePrio',sHeader, sPost);
       Except
       End;
       {$IFDEF LOCALTRACE}DebugMsgFT(logPath,'HTTPPostData result = "'+S+'"');{$ENDIF}
@@ -459,8 +460,8 @@ begin
               B := False;
               If AbortFlag^ = False then
               Begin
-                B := DownloadFileToStringListWithReferer('http://'+Address+':'+IntToStr(Port)+'/query/propertiesGeneral/'+sHash,qBitReferer,sList);
-                If B = False then B := DownloadFileToStringListWithReferer('http://'+Address+':'+IntToStr(Port)+'/json/propertiesGeneral/'+sHash,qBitReferer,sList); // Backward compatibility
+                //B := DownloadFileToStringListWithReferer('http://'+Address+':'+IntToStr(Port)+'/query/propertiesGeneral/'+sHash,qBitReferer,sList);
+                B := DownloadFileToStringListWithReferer('http://'+Address+':'+IntToStr(Port)+'/api/v2/torrents/properties?hash='+sHash,qBitReferer,sList);
               End;
               
               If B = True then If sList.Count > 0 then
@@ -489,7 +490,8 @@ begin
 
                     // Get pieces states
                     sList.Clear;
-                    B := DownloadFileToStringListWithReferer('http://'+Address+':'+IntToStr(Port)+'/query/getPieceStates/'+sHash,qBitReferer,sList);
+                    //B := DownloadFileToStringListWithReferer('http://'+Address+':'+IntToStr(Port)+'/query/getPieceStates/'+sHash,qBitReferer,sList);
+                    B := DownloadFileToStringListWithReferer('http://'+Address+':'+IntToStr(Port)+'/api/v2/torrents/pieceStates?hash='+sHash,qBitReferer,sList);
                     {$IFDEF LOCALTRACE}DebugMsgFT(logPath,'Download piece states success : '+BoolToStr(B,True));{$ENDIF}
                     {$IFDEF DUMPINPUT}DebugMsgFT(logPathInput,'Download piece states success : '+BoolToStr(B,True)+', values:'+CRLF+sList.Text);{$ENDIF}
                     // Parse piece states
@@ -513,8 +515,8 @@ begin
                     B := False;
                     If AbortFlag^ = False then
                     Begin
-                      B := DownloadFileToStringListWithReferer('http://'+Address+':'+IntToStr(Port)+'/query/propertiesFiles/'+sHash,qBitReferer,sList);
-                      If B = False then DownloadFileToStringListWithReferer('http://'+Address+':'+IntToStr(Port)+'/json/propertiesFiles/'+sHash,qBitReferer,sList); // Backward compatibility
+                      //B := DownloadFileToStringListWithReferer('http://'+Address+':'+IntToStr(Port)+'/query/propertiesFiles/'+sHash,qBitReferer,sList);
+                      B := DownloadFileToStringListWithReferer('http://'+Address+':'+IntToStr(Port)+'/api/v2/torrents/files?hash='+sHash,qBitReferer,sList);
                     End;
 
                     If B = True then If sList.Count > 0 then
@@ -603,11 +605,13 @@ begin
                                   If sState = 'queuedUP'    then nItem^.qbitState := dlstateQueued   else
                                   If sState = 'queuedDL'    then nItem^.qbitState := dlstateQueued   else
                                   If sState = 'uploading'   then nItem^.qbitState := dlstateUpload   else
+                                  If sState = 'forcedUP'    then nItem^.qbitState := dlstateUpload   else
                                   If sState = 'stalledUP'   then nItem^.qbitState := dlstateUpload   else
                                   If sState = 'checkingUP'  then nItem^.qbitState := dlstateUpload   else
                                   If sState = 'checkingDL'  then nItem^.qbitState := dlstateDownload else
                                   If sState = 'downloading' then nItem^.qbitState := dlstateDownload else
                                   If sState = 'stalledDL'   then nItem^.qbitState := dlstateDownload else
+                                  If sState = 'forceDL'     then nItem^.qbitState := dlstateDownload else
                                   If sState = 'metaDL'      then nItem^.qbitState := dlstateDownload else
                                                                  nItem^.qbitState := dlstateUnknown;
 
@@ -634,7 +638,7 @@ begin
                                   {$IFDEF LOCALTRACE}Else DebugMsgFT(logPath,'File Range: jPieceList = nil!'){$ENDIF};
 
                                   // Check if the media is playable based on downloaded pieces
-                                  nItem^.qbitPlayable      := qBitTorrent_ReadyForPlayback(nItem,TorrentList);
+                                  nItem^.qbitPlayable := qBitTorrent_ReadyForPlayback(nItem,TorrentList);
 
                                   FileList.Add(nItem);
                                 End
